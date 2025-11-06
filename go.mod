@@ -1,6 +1,6 @@
-module qodeassist-plugin-updater
+module qodeassist-updater
 
-go 1.21
+go 1.23
 
 require (
 	github.com/bodgit/sevenzip v1.6.1
