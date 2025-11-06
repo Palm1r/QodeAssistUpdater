@@ -8,6 +8,10 @@
 *.so
 *.dylib
 
+# Built binaries
+qodeassist-updater
+qodeassist-updater-*
+
 # Test binary, built with `go test -c`
 *.test
 

@@ -1,0 +1,3 @@
+# Qt Creator Plugin Updater Configuration
+qtcreator_path: "/Users/palm1r/Qt/Qt Creator.app/Contents/MacOS/Qt Creator"  # Path to Qt Creator executable
+plugin_path: "/Users/palm1r/Qt/Qt Creator.app/Contents/PlugIns/qtcreator"  # Plugin installation directory
