@@ -224,18 +224,14 @@ func extract7zArchive(archivePath, destDir string) error {
 	return extractArchive(files, destDir, "7z")
 }
 
-func RemovePlugin(pluginDir string, autoYes bool) error {
-	if !PathExists(pluginDir) {
-		return fmt.Errorf("plugin directory does not exist: %s", pluginDir)
+func RemovePlugin(pluginPath string, autoYes bool) error {
+	if !PathExists(pluginPath) {
+		return fmt.Errorf("plugin path does not exist: %s", pluginPath)
 	}
 
-	info, err := os.Stat(pluginDir)
+	info, err := os.Stat(pluginPath)
 	if err != nil {
-		return fmt.Errorf("failed to check plugin directory: %w", err)
-	}
-
-	if !info.IsDir() {
-		return fmt.Errorf("plugin path is not a directory: %s", pluginDir)
+		return fmt.Errorf("failed to check plugin path: %w", err)
 	}
 
 	platformConfig, err := GetPlatformConfig()
@@ -243,19 +239,28 @@ func RemovePlugin(pluginDir string, autoYes bool) error {
 		return err
 	}
 
-	filesToRemove, err := FindPluginFiles(pluginDir, platformConfig.PluginFileName)
-	if err != nil {
-		return err
+	var filesToRemove []string
+	var searchDir string
+
+	if info.IsDir() {
+		filesToRemove = []string{pluginPath}
+		searchDir = filepath.Dir(pluginPath)
+	} else {
+		searchDir = filepath.Dir(pluginPath)
+		filesToRemove, err = FindPluginFiles(searchDir, platformConfig.PluginFileName)
+		if err != nil {
+			return err
+		}
 	}
 
 	if len(filesToRemove) == 0 {
-		return fmt.Errorf("no plugin files found in: %s", pluginDir)
+		return fmt.Errorf("no plugin files found at: %s", pluginPath)
 	}
 
 	fmt.Println()
 	PrintVerbose("The following files will be removed:")
 	for _, file := range filesToRemove {
-		relPath, err := filepath.Rel(pluginDir, file)
+		relPath, err := filepath.Rel(searchDir, file)
 		if err != nil || relPath == "" {
 			relPath = filepath.Base(file)
 		}
@@ -271,14 +276,16 @@ func RemovePlugin(pluginDir string, autoYes bool) error {
 			return fmt.Errorf("failed to remove %s: %w", file, err)
 		}
 
-		relPath, err := filepath.Rel(pluginDir, file)
+		relPath, err := filepath.Rel(searchDir, file)
 		if err != nil || relPath == "" {
 			relPath = filepath.Base(file)
 		}
 		PrintVerbose(fmt.Sprintf("Removed: %s", relPath))
 	}
 
-	cleanupEmptyDirectories(pluginDir)
+	if !info.IsDir() {
+		cleanupEmptyDirectories(searchDir)
+	}
 
 	fmt.Println()
 	PrintSuccess("Plugin removed successfully")
