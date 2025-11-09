@@ -224,7 +224,7 @@ func extract7zArchive(archivePath, destDir string) error {
 	return extractArchive(files, destDir, "7z")
 }
 
-func RemovePlugin(pluginDir string) error {
+func RemovePlugin(pluginDir string, autoYes bool) error {
 	if !PathExists(pluginDir) {
 		return fmt.Errorf("plugin directory does not exist: %s", pluginDir)
 	}
@@ -262,7 +262,7 @@ func RemovePlugin(pluginDir string) error {
 		PrintListItem(relPath)
 	}
 
-	if !ConfirmAction("\nDo you want to proceed with removal? (yes/no): ") {
+	if !autoYes && !ConfirmAction("\nDo you want to proceed with removal? (yes/no): ") {
 		return fmt.Errorf("removal cancelled by user")
 	}
 

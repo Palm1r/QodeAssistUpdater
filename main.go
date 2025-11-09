@@ -20,8 +20,9 @@ func printUsage() {
 	fmt.Println("  --list-versions  List all available plugin versions (>= 0.5.9)")
 	fmt.Println("\nOptions:")
 	fmt.Println("  --config <path>         Path to configuration file (default: config.yaml)")
-	fmt.Println("  --plugin-version <ver>  Install specific plugin version (e.g., 1.2.3 or v1.2.3)")
+	fmt.Println("  --plugin-version <ver>  Install specific plugin version (e.g., 0.8.1 or v0.8.1)")
 	fmt.Println("  --checksum <hash>       Expected SHA256 checksum for verification (optional)")
+	fmt.Println("  -y, --yes               Automatic yes to prompts (non-interactive mode)")
 	fmt.Println("  -h, --help              Show this help message")
 	fmt.Println("  -v, --version           Show version information")
 	fmt.Println("\nExamples:")
@@ -29,10 +30,12 @@ func printUsage() {
 	fmt.Println("  qodeassist-updater --status")
 	fmt.Println("  qodeassist-updater --install")
 	fmt.Println("  qodeassist-updater --update")
-	fmt.Println("  qodeassist-updater --install --plugin-version 1.2.3")
-	fmt.Println("  qodeassist-updater --update --plugin-version 1.2.3")
+	fmt.Println("  qodeassist-updater --update --yes")
+	fmt.Println("  qodeassist-updater --install --plugin-version 0.8.1")
+	fmt.Println("  qodeassist-updater --update --plugin-version 0.8.0")
 	fmt.Println("  qodeassist-updater --install --checksum abc123...")
 	fmt.Println("  qodeassist-updater --remove")
+	fmt.Println("  qodeassist-updater --remove --yes")
 	fmt.Println("  qodeassist-updater --list-versions")
 	fmt.Println("  qodeassist-updater --config /path/to/config.yaml --update")
 }
@@ -76,13 +79,17 @@ func resolveConfigPath(configPath string, defaultPath string) (string, error) {
 func main() {
 	defaultConfigPath := "config.yaml"
 	configPath := flag.String("config", defaultConfigPath, "Path to configuration file")
-	pluginVersion := flag.String("plugin-version", "", "Install specific plugin version (e.g., 1.2.3 or v1.2.3)")
+	pluginVersion := flag.String("plugin-version", "", "Install specific plugin version (e.g., 0.8.1 or v0.8.1)")
 	checksum := flag.String("checksum", "", "Expected SHA256 checksum for verification")
 	statusCmd := flag.Bool("status", false, "Show current plugin and Qt Creator versions")
 	installCmd := flag.Bool("install", false, "Install or reinstall the latest plugin version")
 	updateCmd := flag.Bool("update", false, "Update plugin if a newer version is available")
 	removeCmd := flag.Bool("remove", false, "Remove installed plugin")
 	listVersionsCmd := flag.Bool("list-versions", false, "List all available plugin versions")
+
+	var yesFlag bool
+	flag.BoolVar(&yesFlag, "yes", false, "Automatic yes to prompts (non-interactive mode)")
+	flag.BoolVar(&yesFlag, "y", false, "Automatic yes to prompts (non-interactive mode)")
 
 	var showHelp, showVersion bool
 	flag.BoolVar(&showHelp, "help", false, "Show help message")
@@ -136,9 +143,9 @@ func main() {
 	} else if *installCmd {
 		cmdErr = installPlugin(config, true, *pluginVersion, *checksum)
 	} else if *updateCmd {
-		cmdErr = updatePlugin(config, *pluginVersion, *checksum)
+		cmdErr = updatePlugin(config, *pluginVersion, *checksum, yesFlag)
 	} else if *removeCmd {
-		cmdErr = removePlugin(config)
+		cmdErr = removePlugin(config, yesFlag)
 	}
 
 	if cmdErr != nil {

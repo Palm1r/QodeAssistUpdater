@@ -22,9 +22,8 @@ const (
 
 	MaxDownloadSize = 500 * 1024 * 1024
 
-	HTTPTimeout      = 30 * time.Second
-	CommandTimeout   = 10 * time.Second
-	UserInputTimeout = 5 * time.Minute
+	HTTPTimeout    = 30 * time.Second
+	CommandTimeout = 10 * time.Second
 
 	InitialBackoff = 1 * time.Second
 	MaxBackoff     = 30 * time.Second

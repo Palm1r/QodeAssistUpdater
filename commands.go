@@ -86,10 +86,10 @@ func installPlugin(config *Config, force bool, version string, checksum string) 
 		}
 	}
 
-	return performInstallation(release, qtcVersion, config, checksum, false)
+	return performInstallation(release, qtcVersion, config, checksum, false, false)
 }
 
-func updatePlugin(config *Config, version string, checksum string) error {
+func updatePlugin(config *Config, version string, checksum string, autoYes bool) error {
 	PrintHeader("Update QodeAssist Plugin")
 
 	qtcVersion, err := getAndPrintQtCreatorVersion(config)
@@ -143,10 +143,10 @@ func updatePlugin(config *Config, version string, checksum string) error {
 	}
 	fmt.Println()
 
-	return performInstallation(release, qtcVersion, config, checksum, true)
+	return performInstallation(release, qtcVersion, config, checksum, true, autoYes)
 }
 
-func removePlugin(config *Config) error {
+func removePlugin(config *Config, autoYes bool) error {
 	PrintHeader("Remove QodeAssist Plugin")
 
 	installedVersion, err := getInstalledVersion(config)
@@ -166,7 +166,7 @@ func removePlugin(config *Config) error {
 	PrintStep("Removing plugin...")
 	PrintField("Location", Gray(pluginPath))
 
-	if err := RemovePlugin(pluginPath); err != nil {
+	if err := RemovePlugin(pluginPath, autoYes); err != nil {
 		return fmt.Errorf("failed to remove plugin: %w", err)
 	}
 
@@ -296,7 +296,7 @@ func listVersions() error {
 	return nil
 }
 
-func performInstallation(release *GithubRelease, qtcVersion *Version, config *Config, checksum string, isUpdate bool) error {
+func performInstallation(release *GithubRelease, qtcVersion *Version, config *Config, checksum string, isUpdate bool, autoYes bool) error {
 	assetName, assetURL, err := FindPluginAsset(release, qtcVersion)
 	if err != nil {
 		return fmt.Errorf("failed to find plugin asset: %w", err)
@@ -327,7 +327,7 @@ func performInstallation(release *GithubRelease, qtcVersion *Version, config *Co
 
 	if isUpdate {
 		PrintStep("Checking for old plugin files...")
-		if err := RemoveOldQodeAssistFiles(pluginPath, true); err != nil {
+		if err := RemoveOldQodeAssistFiles(pluginPath, !autoYes); err != nil {
 			return fmt.Errorf("failed to remove old plugin files: %w", err)
 		}
 		fmt.Println()

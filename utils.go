@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -65,35 +64,15 @@ func normalizeChecksum(checksum string) string {
 }
 
 func ConfirmAction(prompt string) bool {
-	ctx, cancel := context.WithTimeout(context.Background(), UserInputTimeout)
-	defer cancel()
-
-	responseChan := make(chan string, 1)
-	errChan := make(chan error, 1)
-
-	go func() {
-		fmt.Print(prompt)
-		reader := bufio.NewReader(os.Stdin)
-		response, err := reader.ReadString('\n')
-		if err != nil {
-			errChan <- err
-			return
-		}
-		responseChan <- response
-	}()
-
-	select {
-	case <-ctx.Done():
-		fmt.Println()
-		PrintWarning("Input timeout - operation cancelled")
-		return false
-	case err := <-errChan:
+	fmt.Print(prompt)
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to read user input: %v\n", err)
 		return false
-	case response := <-responseChan:
-		response = strings.ToLower(strings.TrimSpace(response))
-		return response == "yes" || response == "y"
 	}
+	response = strings.ToLower(strings.TrimSpace(response))
+	return response == "yes" || response == "y"
 }
 
 func PathExists(path string) bool {

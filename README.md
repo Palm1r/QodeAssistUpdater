@@ -20,7 +20,9 @@ go build -o qodeassist-updater
 ./qodeassist-updater --status         # Check status and available updates
 ./qodeassist-updater --install        # Install the plugin (latest version)
 ./qodeassist-updater --update         # Update to latest version
+./qodeassist-updater --update --yes   # Update without confirmation (non-interactive)
 ./qodeassist-updater --remove         # Remove the plugin
+./qodeassist-updater --remove --yes   # Remove without confirmation (non-interactive)
 ./qodeassist-updater --list-versions  # List all available versions (>= 0.5.9)
 ./qodeassist-updater --help           # Show help
 ```
@@ -45,10 +47,10 @@ This will display each plugin version along with the Qt Creator versions it supp
 You can install or update to a specific plugin version:
 
 ```bash
-./qodeassist-updater --install --plugin-version 1.2.3
-./qodeassist-updater --update --plugin-version 1.2.3
+./qodeassist-updater --install --plugin-version 0.8.1
+./qodeassist-updater --update --plugin-version 0.8.0
 # Or with 'v' prefix:
-./qodeassist-updater --install --plugin-version v1.2.3
+./qodeassist-updater --install --plugin-version v0.8.1
 ```
 
 ### Checksum verification (optional)
@@ -57,7 +59,16 @@ You can install or update to a specific plugin version:
 ./qodeassist-updater --install --checksum abc123...
 ./qodeassist-updater --update --checksum abc123...
 # With specific version:
-./qodeassist-updater --install --plugin-version 1.2.3 --checksum abc123...
+./qodeassist-updater --install --plugin-version 0.8.1 --checksum abc123...
+```
+
+### Non-interactive mode
+
+For automated scripts and CI/CD pipelines, use the `--yes` or `-y` flag to skip confirmation prompts:
+
+```bash
+./qodeassist-updater --update --yes
+./qodeassist-updater --remove -y
 ```
 
 ### Custom config path
