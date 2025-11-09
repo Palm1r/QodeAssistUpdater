@@ -13,10 +13,11 @@ func printUsage() {
 	fmt.Println("\nUsage:")
 	fmt.Println("  qodeassist-updater [options] <command>")
 	fmt.Println("\nCommands:")
-	fmt.Println("  --status     Show current plugin and Qt Creator versions")
-	fmt.Println("  --install    Install or reinstall the latest plugin version")
-	fmt.Println("  --update     Update plugin if a newer version is available")
-	fmt.Println("  --remove     Remove installed plugin")
+	fmt.Println("  --status         Show current plugin and Qt Creator versions")
+	fmt.Println("  --install        Install or reinstall the latest plugin version")
+	fmt.Println("  --update         Update plugin if a newer version is available")
+	fmt.Println("  --remove         Remove installed plugin")
+	fmt.Println("  --list-versions  List all available plugin versions (>= 0.5.9)")
 	fmt.Println("\nOptions:")
 	fmt.Println("  --config <path>         Path to configuration file (default: config.yaml)")
 	fmt.Println("  --plugin-version <ver>  Install specific plugin version (e.g., 1.2.3 or v1.2.3)")
@@ -32,6 +33,7 @@ func printUsage() {
 	fmt.Println("  qodeassist-updater --update --plugin-version 1.2.3")
 	fmt.Println("  qodeassist-updater --install --checksum abc123...")
 	fmt.Println("  qodeassist-updater --remove")
+	fmt.Println("  qodeassist-updater --list-versions")
 	fmt.Println("  qodeassist-updater --config /path/to/config.yaml --update")
 }
 
@@ -80,6 +82,7 @@ func main() {
 	installCmd := flag.Bool("install", false, "Install or reinstall the latest plugin version")
 	updateCmd := flag.Bool("update", false, "Update plugin if a newer version is available")
 	removeCmd := flag.Bool("remove", false, "Remove installed plugin")
+	listVersionsCmd := flag.Bool("list-versions", false, "List all available plugin versions")
 
 	var showHelp, showVersion bool
 	flag.BoolVar(&showHelp, "help", false, "Show help message")
@@ -100,8 +103,18 @@ func main() {
 		os.Exit(0)
 	}
 
-	if !*statusCmd && !*installCmd && !*updateCmd && !*removeCmd {
+	if !*statusCmd && !*installCmd && !*updateCmd && !*removeCmd && !*listVersionsCmd {
 		printUsage()
+		os.Exit(0)
+	}
+
+	// Handle list-versions command (doesn't need config)
+	if *listVersionsCmd {
+		cmdErr := listVersions()
+		if cmdErr != nil {
+			fmt.Fprintf(os.Stderr, "Command failed: %v\n", cmdErr)
+			os.Exit(1)
+		}
 		os.Exit(0)
 	}
 

@@ -145,6 +145,60 @@ func GetGithubReleaseByTag(repo string, tag string) (*GithubRelease, error) {
 	return &release, nil
 }
 
+func GetAllGithubReleases(repo string) ([]GithubRelease, error) {
+	if strings.Contains(repo, "/..") || strings.Contains(repo, "\\") {
+		return nil, fmt.Errorf("invalid repository name: %s", repo)
+	}
+
+	parts := strings.Split(repo, "/")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid repository format: %s (expected owner/repo)", repo)
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases", repo)
+
+	var resp *http.Response
+	var err error
+	maxRetries := 3
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			backoff := time.Duration(1<<uint(attempt-1)) * time.Second
+			time.Sleep(backoff)
+		}
+
+		resp, err = githubClient.Get(apiURL)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			break
+		}
+
+		if resp != nil {
+			resp.Body.Close()
+		}
+
+		if attempt == maxRetries {
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch releases after %d attempts: %w", maxRetries+1, err)
+			}
+			return nil, fmt.Errorf("github API returned status: %d after %d attempts", resp.StatusCode, maxRetries+1)
+		}
+	}
+	defer resp.Body.Close()
+
+	limitedReader := io.LimitReader(resp.Body, MaxGitHubAPIResponseSize)
+	body, err := io.ReadAll(limitedReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var releases []GithubRelease
+	if err := json.Unmarshal(body, &releases); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+
+	return releases, nil
+}
+
 func FindPluginAsset(release *GithubRelease, qtCreatorVersion *Version) (string, string, error) {
 	platformName, archName, err := GetPlatformArchName()
 	if err != nil {

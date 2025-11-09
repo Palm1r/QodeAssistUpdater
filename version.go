@@ -50,6 +50,19 @@ func (v *Version) IsNewer(other *Version) bool {
 	return v.Patch > other.Patch
 }
 
+func (v *Version) IsGreaterOrEqual(other *Version) bool {
+	if other == nil {
+		return true
+	}
+	if v.Major != other.Major {
+		return v.Major > other.Major
+	}
+	if v.Minor != other.Minor {
+		return v.Minor > other.Minor
+	}
+	return v.Patch >= other.Patch
+}
+
 func (v *Version) String() string {
 	return fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
 }

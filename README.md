@@ -16,12 +16,21 @@ go build -o qodeassist-updater
 ## Usage
 
 ```bash
-./qodeassist-updater --version    # Show version information
-./qodeassist-updater --status     # Check status and available updates
-./qodeassist-updater --install    # Install the plugin (latest version)
-./qodeassist-updater --update     # Update to latest version
-./qodeassist-updater --remove     # Remove the plugin
-./qodeassist-updater --help       # Show help
+./qodeassist-updater --version        # Show version information
+./qodeassist-updater --status         # Check status and available updates
+./qodeassist-updater --install        # Install the plugin (latest version)
+./qodeassist-updater --update         # Update to latest version
+./qodeassist-updater --remove         # Remove the plugin
+./qodeassist-updater --list-versions  # List all available versions (>= 0.5.9)
+./qodeassist-updater --help           # Show help
+```
+
+### List available versions
+
+You can list all available plugin versions starting from 0.5.9:
+
+```bash
+./qodeassist-updater --list-versions
 ```
 
 ### Install specific version

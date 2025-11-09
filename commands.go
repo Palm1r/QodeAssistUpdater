@@ -230,6 +230,57 @@ func getAndPrintSpecificRelease(version string) (*GithubRelease, error) {
 	return release, nil
 }
 
+func listVersions() error {
+	PrintHeader("Available QodeAssist Plugin Versions")
+
+	minVersion, err := ParseVersion("0.5.9")
+	if err != nil {
+		return fmt.Errorf("failed to parse minimum version: %w", err)
+	}
+
+	PrintField("Minimum version", minVersion.String())
+	fmt.Println()
+
+	PrintStep("Fetching releases from GitHub...")
+	releases, err := GetAllGithubReleases(GithubRepo)
+	if err != nil {
+		return fmt.Errorf("failed to fetch releases: %w", err)
+	}
+
+	var validVersions []*Version
+	for _, release := range releases {
+		if release.TagName == "" {
+			continue
+		}
+		
+		version, err := ParseVersion(release.TagName)
+		if err != nil {
+			continue
+		}
+
+		if version.IsGreaterOrEqual(minVersion) {
+			validVersions = append(validVersions, version)
+		}
+	}
+
+	if len(validVersions) == 0 {
+		PrintWarning(fmt.Sprintf("No versions found >= %s", minVersion.String()))
+		return nil
+	}
+
+	PrintStatus("success", fmt.Sprintf("Found %d version(s)", len(validVersions)))
+	fmt.Println()
+
+	for i, version := range validVersions {
+		fmt.Printf("  %s %s\n", Green("•"), version.String())
+		if (i+1)%10 == 0 && i+1 < len(validVersions) {
+			fmt.Println()
+		}
+	}
+
+	return nil
+}
+
 func performInstallation(release *GithubRelease, qtcVersion *Version, config *Config, checksum string, isUpdate bool) error {
 	assetName, assetURL, err := FindPluginAsset(release, qtcVersion)
 	if err != nil {
