@@ -52,7 +52,7 @@ func showStatus(config *Config) error {
 	return nil
 }
 
-func installPlugin(config *Config, force bool, checksum string) error {
+func installPlugin(config *Config, force bool, version string, checksum string) error {
 	PrintHeader("Install QodeAssist Plugin")
 
 	qtcVersion, err := getAndPrintQtCreatorVersion(config)
@@ -70,16 +70,25 @@ func installPlugin(config *Config, force bool, checksum string) error {
 	}
 
 	fmt.Println()
-	PrintStep("Fetching latest release...")
-	release, _, err := getAndPrintLatestRelease()
-	if err != nil {
-		return err
+	var release *GithubRelease
+	if version != "" {
+		PrintStep(fmt.Sprintf("Fetching release %s...", version))
+		release, err = getAndPrintSpecificRelease(version)
+		if err != nil {
+			return err
+		}
+	} else {
+		PrintStep("Fetching latest release...")
+		release, _, err = getAndPrintLatestRelease()
+		if err != nil {
+			return err
+		}
 	}
 
 	return performInstallation(release, qtcVersion, config, checksum, false)
 }
 
-func updatePlugin(config *Config, checksum string) error {
+func updatePlugin(config *Config, version string, checksum string) error {
 	PrintHeader("Update QodeAssist Plugin")
 
 	qtcVersion, err := getAndPrintQtCreatorVersion(config)
@@ -96,20 +105,41 @@ func updatePlugin(config *Config, checksum string) error {
 	PrintFieldColored("Current version", installedVersion.String(), "cyan")
 
 	fmt.Println()
-	PrintStep("Checking for updates...")
-	release, latestVersion, err := getAndPrintLatestRelease()
-	if err != nil {
-		return err
+	var release *GithubRelease
+	var targetVersion *Version
+	
+	if version != "" {
+		PrintStep(fmt.Sprintf("Fetching release %s...", version))
+		release, err = getAndPrintSpecificRelease(version)
+		if err != nil {
+			return err
+		}
+		targetVersion, err = ParseVersion(release.TagName)
+		if err != nil {
+			return fmt.Errorf("failed to parse release version: %w", err)
+		}
+	} else {
+		PrintStep("Checking for updates...")
+		release, targetVersion, err = getAndPrintLatestRelease()
+		if err != nil {
+			return err
+		}
 	}
 
-	if !latestVersion.IsNewer(installedVersion) {
+	if !targetVersion.IsNewer(installedVersion) && version == "" {
 		PrintStatus("success", "Already up to date!")
 		return nil
 	}
 
-	PrintStatus("info", "Update available")
-	PrintField("Current", Red(installedVersion.String()))
-	PrintField("Latest", Green(latestVersion.String()))
+	if targetVersion.IsNewer(installedVersion) {
+		PrintStatus("info", "Update available")
+		PrintField("Current", Red(installedVersion.String()))
+		PrintField("Target", Green(targetVersion.String()))
+	} else if version != "" {
+		PrintStatus("warning", "Installing older or same version")
+		PrintField("Current", Yellow(installedVersion.String()))
+		PrintField("Target", Cyan(targetVersion.String()))
+	}
 	fmt.Println()
 
 	return performInstallation(release, qtcVersion, config, checksum, true)
@@ -183,6 +213,21 @@ func getAndPrintLatestRelease() (*GithubRelease, *Version, error) {
 
 	PrintFieldColored("Latest version", latestVersion.String(), "green")
 	return release, latestVersion, nil
+}
+
+func getAndPrintSpecificRelease(version string) (*GithubRelease, error) {
+	release, err := GetGithubReleaseByTag(GithubRepo, version)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get release %s: %w", version, err)
+	}
+
+	releaseVersion, err := ParseVersion(release.TagName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse release version: %w", err)
+	}
+
+	PrintFieldColored("Plugin version", releaseVersion.String(), "green")
+	return release, nil
 }
 
 func performInstallation(release *GithubRelease, qtcVersion *Version, config *Config, checksum string, isUpdate bool) error {

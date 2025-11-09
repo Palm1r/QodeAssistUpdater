@@ -18,17 +18,19 @@ func printUsage() {
 	fmt.Println("  --update     Update plugin if a newer version is available")
 	fmt.Println("  --remove     Remove installed plugin")
 	fmt.Println("\nOptions:")
-	fmt.Println("  --config <path>      Path to configuration file (default: config.yaml)")
-	fmt.Println("  --checksum <hash>    Expected SHA256 checksum for verification (optional)")
-	fmt.Println("  -h, --help           Show this help message")
-	fmt.Println("  -v, --version        Show version information")
+	fmt.Println("  --config <path>         Path to configuration file (default: config.yaml)")
+	fmt.Println("  --plugin-version <ver>  Install specific plugin version (e.g., 1.2.3 or v1.2.3)")
+	fmt.Println("  --checksum <hash>       Expected SHA256 checksum for verification (optional)")
+	fmt.Println("  -h, --help              Show this help message")
+	fmt.Println("  -v, --version           Show version information")
 	fmt.Println("\nExamples:")
 	fmt.Println("  qodeassist-updater --version")
 	fmt.Println("  qodeassist-updater --status")
 	fmt.Println("  qodeassist-updater --install")
 	fmt.Println("  qodeassist-updater --update")
+	fmt.Println("  qodeassist-updater --install --plugin-version 1.2.3")
+	fmt.Println("  qodeassist-updater --update --plugin-version 1.2.3")
 	fmt.Println("  qodeassist-updater --install --checksum abc123...")
-	fmt.Println("  qodeassist-updater --update --checksum abc123...")
 	fmt.Println("  qodeassist-updater --remove")
 	fmt.Println("  qodeassist-updater --config /path/to/config.yaml --update")
 }
@@ -72,6 +74,7 @@ func resolveConfigPath(configPath string, defaultPath string) (string, error) {
 func main() {
 	defaultConfigPath := "config.yaml"
 	configPath := flag.String("config", defaultConfigPath, "Path to configuration file")
+	pluginVersion := flag.String("plugin-version", "", "Install specific plugin version (e.g., 1.2.3 or v1.2.3)")
 	checksum := flag.String("checksum", "", "Expected SHA256 checksum for verification")
 	statusCmd := flag.Bool("status", false, "Show current plugin and Qt Creator versions")
 	installCmd := flag.Bool("install", false, "Install or reinstall the latest plugin version")
@@ -118,9 +121,9 @@ func main() {
 	if *statusCmd {
 		cmdErr = showStatus(config)
 	} else if *installCmd {
-		cmdErr = installPlugin(config, true, *checksum)
+		cmdErr = installPlugin(config, true, *pluginVersion, *checksum)
 	} else if *updateCmd {
-		cmdErr = updatePlugin(config, *checksum)
+		cmdErr = updatePlugin(config, *pluginVersion, *checksum)
 	} else if *removeCmd {
 		cmdErr = removePlugin(config)
 	}

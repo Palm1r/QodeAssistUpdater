@@ -79,6 +79,72 @@ func GetLatestGithubRelease(repo string) (*GithubRelease, error) {
 	return &release, nil
 }
 
+func GetGithubReleaseByTag(repo string, tag string) (*GithubRelease, error) {
+	if strings.Contains(repo, "/..") || strings.Contains(repo, "\\") {
+		return nil, fmt.Errorf("invalid repository name: %s", repo)
+	}
+
+	parts := strings.Split(repo, "/")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid repository format: %s (expected owner/repo)", repo)
+	}
+
+	// Ensure tag starts with 'v'
+	if !strings.HasPrefix(tag, "v") {
+		tag = "v" + tag
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/tags/%s", repo, tag)
+
+	var resp *http.Response
+	var err error
+	maxRetries := 3
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			backoff := time.Duration(1<<uint(attempt-1)) * time.Second
+			time.Sleep(backoff)
+		}
+
+		resp, err = githubClient.Get(apiURL)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			break
+		}
+
+		if resp != nil {
+			resp.Body.Close()
+		}
+
+		if attempt == maxRetries {
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch release after %d attempts: %w", maxRetries+1, err)
+			}
+			if resp.StatusCode == http.StatusNotFound {
+				return nil, fmt.Errorf("release with tag %s not found", tag)
+			}
+			return nil, fmt.Errorf("github API returned status: %d after %d attempts", resp.StatusCode, maxRetries+1)
+		}
+	}
+	defer resp.Body.Close()
+
+	limitedReader := io.LimitReader(resp.Body, MaxGitHubAPIResponseSize)
+	body, err := io.ReadAll(limitedReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var release GithubRelease
+	if err := json.Unmarshal(body, &release); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+
+	if release.TagName == "" {
+		return nil, fmt.Errorf("release tag name is empty")
+	}
+
+	return &release, nil
+}
+
 func FindPluginAsset(release *GithubRelease, qtCreatorVersion *Version) (string, string, error) {
 	platformName, archName, err := GetPlatformArchName()
 	if err != nil {

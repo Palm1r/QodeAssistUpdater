@@ -18,10 +18,21 @@ go build -o qodeassist-updater
 ```bash
 ./qodeassist-updater --version    # Show version information
 ./qodeassist-updater --status     # Check status and available updates
-./qodeassist-updater --install    # Install the plugin
+./qodeassist-updater --install    # Install the plugin (latest version)
 ./qodeassist-updater --update     # Update to latest version
 ./qodeassist-updater --remove     # Remove the plugin
 ./qodeassist-updater --help       # Show help
+```
+
+### Install specific version
+
+You can install or update to a specific plugin version:
+
+```bash
+./qodeassist-updater --install --plugin-version 1.2.3
+./qodeassist-updater --update --plugin-version 1.2.3
+# Or with 'v' prefix:
+./qodeassist-updater --install --plugin-version v1.2.3
 ```
 
 ### Checksum verification (optional)
@@ -29,6 +40,8 @@ go build -o qodeassist-updater
 ```bash
 ./qodeassist-updater --install --checksum abc123...
 ./qodeassist-updater --update --checksum abc123...
+# With specific version:
+./qodeassist-updater --install --plugin-version 1.2.3 --checksum abc123...
 ```
 
 ### Custom config path
