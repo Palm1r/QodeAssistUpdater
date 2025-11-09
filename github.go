@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
@@ -242,4 +244,32 @@ func FindPluginAsset(release *GithubRelease, qtCreatorVersion *Version) (string,
 	}
 
 	return matchingAssets[0].Name, matchingAssets[0].URL, nil
+}
+
+func ExtractQtCreatorVersions(release *GithubRelease) []string {
+	qtcVersionPattern := regexp.MustCompile(`QtC(\d+\.\d+(?:\.\d+)?)`)
+	versionMap := make(map[string]bool)
+
+	for _, asset := range release.Assets {
+		matches := qtcVersionPattern.FindStringSubmatch(asset.Name)
+		if len(matches) > 1 {
+			versionMap[matches[1]] = true
+		}
+	}
+
+	versions := make([]string, 0, len(versionMap))
+	for version := range versionMap {
+		versions = append(versions, version)
+	}
+
+	sort.Slice(versions, func(i, j int) bool {
+		vi, _ := ParseVersion(versions[i])
+		vj, _ := ParseVersion(versions[j])
+		if vi == nil || vj == nil {
+			return versions[i] < versions[j]
+		}
+		return !vi.IsNewer(vj)
+	})
+
+	return versions
 }

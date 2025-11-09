@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func showStatus(config *Config) error {
@@ -107,7 +108,7 @@ func updatePlugin(config *Config, version string, checksum string) error {
 	fmt.Println()
 	var release *GithubRelease
 	var targetVersion *Version
-	
+
 	if version != "" {
 		PrintStep(fmt.Sprintf("Fetching release %s...", version))
 		release, err = getAndPrintSpecificRelease(version)
@@ -247,35 +248,49 @@ func listVersions() error {
 		return fmt.Errorf("failed to fetch releases: %w", err)
 	}
 
-	var validVersions []*Version
+	type ReleaseInfo struct {
+		Version     *Version
+		QtCVersions []string
+	}
+
+	var validReleases []ReleaseInfo
 	for _, release := range releases {
 		if release.TagName == "" {
 			continue
 		}
-		
+
 		version, err := ParseVersion(release.TagName)
 		if err != nil {
 			continue
 		}
 
 		if version.IsGreaterOrEqual(minVersion) {
-			validVersions = append(validVersions, version)
+			qtcVersions := ExtractQtCreatorVersions(&release)
+			validReleases = append(validReleases, ReleaseInfo{
+				Version:     version,
+				QtCVersions: qtcVersions,
+			})
 		}
 	}
 
-	if len(validVersions) == 0 {
+	if len(validReleases) == 0 {
 		PrintWarning(fmt.Sprintf("No versions found >= %s", minVersion.String()))
 		return nil
 	}
 
-	PrintStatus("success", fmt.Sprintf("Found %d version(s)", len(validVersions)))
+	PrintStatus("success", fmt.Sprintf("Found %d version(s)", len(validReleases)))
 	fmt.Println()
 
-	for i, version := range validVersions {
-		fmt.Printf("  %s %s\n", Green("•"), version.String())
-		if (i+1)%10 == 0 && i+1 < len(validVersions) {
-			fmt.Println()
+	for _, info := range validReleases {
+		qtcVersionsStr := "N/A"
+		if len(info.QtCVersions) > 0 {
+			qtcVersionsStr = strings.Join(info.QtCVersions, ", ")
 		}
+		fmt.Printf("  %s %s %s %s\n",
+			Green("•"),
+			Cyan(fmt.Sprintf("%-6s", info.Version.String())),
+			Gray("→ Qt Creator:"),
+			Yellow(qtcVersionsStr))
 	}
 
 	return nil

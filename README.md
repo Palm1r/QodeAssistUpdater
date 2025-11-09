@@ -27,10 +27,17 @@ go build -o qodeassist-updater
 
 ### List available versions
 
-You can list all available plugin versions starting from 0.5.9:
+You can list all available plugin versions starting from 0.5.9 with their supported Qt Creator versions:
 
 ```bash
 ./qodeassist-updater --list-versions
+```
+
+This will display each plugin version along with the Qt Creator versions it supports, for example:
+```
+• 0.8.1  → Qt Creator: 16.0.2, 17.0.2, 18.0.0
+• 0.8.0  → Qt Creator: 16.0.2, 17.0.2, 18.0.0
+• 0.7.1  → Qt Creator: 16.0.2, 17.0.2
 ```
 
 ### Install specific version
