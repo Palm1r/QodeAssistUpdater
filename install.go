@@ -77,9 +77,10 @@ func RemoveOldQodeAssistFiles(pluginDir string, interactive bool) error {
 	}
 
 	if interactive {
-		fmt.Println("\nThe following old plugin files will be removed before update:")
+		fmt.Println()
+		PrintVerbose("The following old plugin files will be removed before update:")
 		for _, file := range filesToRemove {
-			fmt.Printf("  - %s\n", file)
+			PrintListItem(file)
 		}
 
 		if !ConfirmAction("\nDo you want to proceed with removing old files? (yes/no): ") {
@@ -93,7 +94,7 @@ func RemoveOldQodeAssistFiles(pluginDir string, interactive bool) error {
 		}
 
 		if interactive {
-			fmt.Printf("Removed: %s\n", file)
+			PrintVerbose(fmt.Sprintf("Removed: %s", file))
 		}
 	}
 
@@ -185,12 +186,12 @@ func extractArchive(files []archiveFile, destDir, archiveType string) error {
 		}
 	}
 
-	fmt.Println("Archive extracted successfully")
+	PrintSuccess("Archive extracted successfully")
 	return nil
 }
 
 func extractZipArchive(archivePath, destDir string) error {
-	fmt.Printf("Extracting ZIP archive...\n")
+	PrintStep("Extracting ZIP archive...")
 
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
@@ -207,7 +208,7 @@ func extractZipArchive(archivePath, destDir string) error {
 }
 
 func extract7zArchive(archivePath, destDir string) error {
-	fmt.Printf("Extracting 7z archive...\n")
+	PrintStep("Extracting 7z archive...")
 
 	r, err := sevenzip.OpenReader(archivePath)
 	if err != nil {
@@ -251,13 +252,14 @@ func RemovePlugin(pluginDir string) error {
 		return fmt.Errorf("no plugin files found in: %s", pluginDir)
 	}
 
-	fmt.Println("\nThe following files will be removed:")
+	fmt.Println()
+	PrintVerbose("The following files will be removed:")
 	for _, file := range filesToRemove {
 		relPath, err := filepath.Rel(pluginDir, file)
 		if err != nil || relPath == "" {
 			relPath = filepath.Base(file)
 		}
-		fmt.Printf("  - %s\n", relPath)
+		PrintListItem(relPath)
 	}
 
 	if !ConfirmAction("\nDo you want to proceed with removal? (yes/no): ") {
@@ -273,12 +275,13 @@ func RemovePlugin(pluginDir string) error {
 		if err != nil || relPath == "" {
 			relPath = filepath.Base(file)
 		}
-		fmt.Printf("Removed: %s\n", relPath)
+		PrintVerbose(fmt.Sprintf("Removed: %s", relPath))
 	}
 
 	cleanupEmptyDirectories(pluginDir)
 
-	fmt.Println("\nPlugin removed successfully")
+	fmt.Println()
+	PrintSuccess("Plugin removed successfully")
 	return nil
 }
 

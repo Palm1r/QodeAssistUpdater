@@ -132,3 +132,15 @@ func PrintStatus(status, message string) {
 func PrintStep(message string) {
 	fmt.Printf("%s %s\n", Cyan(symbolArrow), message)
 }
+
+func PrintVerbose(message string) {
+	fmt.Println(message)
+}
+
+func PrintListItem(item string) {
+	fmt.Printf("  %s %s\n", Gray("-"), item)
+}
+
+func PrintColoredListItem(symbol, text string) {
+	fmt.Printf("  %s %s\n", symbol, text)
+}

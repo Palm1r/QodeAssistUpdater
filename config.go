@@ -164,12 +164,12 @@ plugin_path: "%s"
 
 		platformConfig, _ := GetPlatformConfig()
 		if platformConfig != nil {
-			fmt.Println(Gray("Please verify the configuration file and update paths if needed:"))
-			fmt.Printf(Gray("  Config: %s\n"), path)
+			PrintVerbose(Gray("Please verify the configuration file and update paths if needed:"))
+			PrintVerbose(Gray(fmt.Sprintf("  Config: %s", path)))
 			fmt.Println()
-			fmt.Println(Gray("Default Qt Creator paths:"))
+			PrintVerbose(Gray("Default Qt Creator paths:"))
 			for _, p := range platformConfig.QtCreatorPaths {
-				fmt.Printf(Gray("  • %s\n"), p)
+				PrintVerbose(Gray(fmt.Sprintf("  • %s", p)))
 			}
 		}
 

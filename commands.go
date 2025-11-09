@@ -286,11 +286,11 @@ func listVersions() error {
 		if len(info.QtCVersions) > 0 {
 			qtcVersionsStr = strings.Join(info.QtCVersions, ", ")
 		}
-		fmt.Printf("  %s %s %s %s\n",
-			Green("•"),
+		text := fmt.Sprintf("%s %s %s",
 			Cyan(fmt.Sprintf("%-6s", info.Version.String())),
 			Gray("→ Qt Creator:"),
 			Yellow(qtcVersionsStr))
+		PrintColoredListItem(Green("•"), text)
 	}
 
 	return nil

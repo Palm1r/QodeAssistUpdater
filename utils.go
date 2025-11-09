@@ -33,7 +33,7 @@ func VerifyFileChecksum(filePath, expectedChecksum string) error {
 		return nil
 	}
 
-	fmt.Printf("Verifying checksum...\n")
+	PrintStep("Verifying checksum...")
 	actualChecksum, err := CalculateFileChecksum(filePath)
 	if err != nil {
 		return err
@@ -46,7 +46,7 @@ func VerifyFileChecksum(filePath, expectedChecksum string) error {
 		return fmt.Errorf("checksum mismatch!\nExpected: %s\nActual:   %s", expectedChecksum, actualChecksum)
 	}
 
-	fmt.Printf("Checksum verified: %s\n", actualChecksum)
+	PrintSuccess(fmt.Sprintf("Checksum verified: %s", actualChecksum))
 	return nil
 }
 
@@ -84,7 +84,8 @@ func ConfirmAction(prompt string) bool {
 
 	select {
 	case <-ctx.Done():
-		fmt.Println("\nInput timeout - operation cancelled")
+		fmt.Println()
+		PrintWarning("Input timeout - operation cancelled")
 		return false
 	case err := <-errChan:
 		fmt.Fprintf(os.Stderr, "Failed to read user input: %v\n", err)
