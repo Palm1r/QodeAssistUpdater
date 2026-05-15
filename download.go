@@ -36,7 +36,7 @@ func validateURL(rawURL string) error {
 	allowedHosts := []string{"github.com", "githubusercontent.com"}
 	validHost := false
 	for _, host := range allowedHosts {
-		if strings.HasSuffix(parsedURL.Host, host) {
+		if parsedURL.Hostname() == host || strings.HasSuffix(parsedURL.Hostname(), "."+host) {
 			validHost = true
 			break
 		}

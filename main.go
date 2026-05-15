@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
+	"time"
 )
 
 func printUsage() {
@@ -13,77 +13,74 @@ func printUsage() {
 	fmt.Println("\nUsage:")
 	fmt.Println("  qodeassist-updater [options] <command>")
 	fmt.Println("\nCommands:")
-	fmt.Println("  --status         Show current plugin and Qt Creator versions")
-	fmt.Println("  --install        Install or reinstall the latest plugin version")
-	fmt.Println("  --update         Update plugin if a newer version is available")
+	fmt.Println("  --install        Download and install the plugin")
+	fmt.Println("  --update         Reinstall, removing old plugin files first")
 	fmt.Println("  --remove         Remove installed plugin")
 	fmt.Println("  --list-versions  List all available plugin versions (>= 0.5.9)")
 	fmt.Println("\nOptions:")
-	fmt.Println("  --config <path>         Path to configuration file (default: config.yaml)")
-	fmt.Println("  --plugin-version <ver>  Install specific plugin version (e.g., 0.8.1 or v0.8.1)")
+	fmt.Println("  --qtc-version <ver>     Qt Creator version (required for install/update), e.g. 14.0.2")
+	fmt.Println("  --plugin-dir <path>     Directory to install into / remove from (required for install/update/remove)")
+	fmt.Println("  --plugin-version <ver>  Install specific plugin version (e.g. 0.8.1 or v0.8.1)")
 	fmt.Println("  --checksum <hash>       Expected SHA256 checksum for verification (optional)")
+	fmt.Println("  --wait-pid <pid>        Wait for this process to exit before touching files")
+	fmt.Println("  --wait-timeout <sec>    Timeout for --wait-pid in seconds (default 120, 0 = infinite)")
+	fmt.Println("  --log-file <path>       Mirror all output into a log file")
+	fmt.Println("  --relaunch <path>       Launch this application after a successful install/update")
 	fmt.Println("  -y, --yes               Automatic yes to prompts (non-interactive mode)")
 	fmt.Println("  -h, --help              Show this help message")
 	fmt.Println("  -v, --version           Show version information")
 	fmt.Println("\nExamples:")
-	fmt.Println("  qodeassist-updater --version")
-	fmt.Println("  qodeassist-updater --status")
-	fmt.Println("  qodeassist-updater --install")
-	fmt.Println("  qodeassist-updater --update")
-	fmt.Println("  qodeassist-updater --update --yes")
-	fmt.Println("  qodeassist-updater --install --plugin-version 0.8.1")
-	fmt.Println("  qodeassist-updater --update --plugin-version 0.8.0")
-	fmt.Println("  qodeassist-updater --install --checksum abc123...")
-	fmt.Println("  qodeassist-updater --remove")
-	fmt.Println("  qodeassist-updater --remove --yes")
+	fmt.Println("  qodeassist-updater --install --qtc-version 14.0.2 --plugin-dir ~/QtPlugins")
+	fmt.Println("  qodeassist-updater --update --qtc-version 14.0.2 --plugin-dir ~/QtPlugins --yes")
+	fmt.Println("  qodeassist-updater --remove --plugin-dir ~/QtPlugins")
 	fmt.Println("  qodeassist-updater --list-versions")
-	fmt.Println("  qodeassist-updater --config /path/to/config.yaml --update")
+	fmt.Println("\nDetached update from Qt Creator (wait for it to quit, then relaunch):")
+	fmt.Println("  qodeassist-updater --update --qtc-version 14.0.2 --plugin-dir ~/QtPlugins \\")
+	fmt.Println("      --yes --wait-pid 12345 --log-file ~/qodeassist-update.log \\")
+	fmt.Println("      --relaunch \"/Applications/Qt Creator.app\"")
 }
 
 func printVersion() {
 	fmt.Printf("%s version %s\n", AppName, AppVersion)
 }
 
-func resolveConfigPath(configPath string, defaultPath string) (string, error) {
-	if configPath != defaultPath {
-		return configPath, nil
+func resolvePluginDir(dir string) (string, error) {
+	if dir == "" {
+		return "", fmt.Errorf("--plugin-dir is required")
 	}
-
-	execPath, err := os.Executable()
+	expanded, err := ExpandPath(dir)
 	if err != nil {
-		execPath, err = filepath.Abs(os.Args[0])
-		if err != nil {
-			return "", fmt.Errorf("failed to resolve executable path: %w", err)
-		}
+		return "", fmt.Errorf("failed to expand plugin directory: %w", err)
 	}
-	execDir := filepath.Dir(execPath)
-	configPathInExecDir := filepath.Join(execDir, defaultPath)
+	return expanded, nil
+}
 
-	if PathExists(configPathInExecDir) {
-		return configPathInExecDir, nil
+func resolveQtcVersion(version string) (*Version, error) {
+	if version == "" {
+		return nil, fmt.Errorf("--qtc-version is required for install/update")
 	}
-
-	if PathExists(configPath) {
-		return configPath, nil
+	v, err := ParseVersion(version)
+	if err != nil {
+		return nil, fmt.Errorf("invalid --qtc-version: %w", err)
 	}
-
-	PrintInfo("Config file not found, creating default...")
-	fmt.Println()
-	if err := CreateDefaultConfig(configPathInExecDir); err != nil {
-		return "", err
-	}
-
-	return configPathInExecDir, nil
+	return v, nil
 }
 
 func main() {
-	defaultConfigPath := "config.yaml"
-	configPath := flag.String("config", defaultConfigPath, "Path to configuration file")
-	pluginVersion := flag.String("plugin-version", "", "Install specific plugin version (e.g., 0.8.1 or v0.8.1)")
+	os.Exit(run())
+}
+
+func run() int {
+	qtcVersionFlag := flag.String("qtc-version", "", "Qt Creator version (e.g. 14.0.2)")
+	pluginDirFlag := flag.String("plugin-dir", "", "Directory to install into / remove from")
+	pluginVersion := flag.String("plugin-version", "", "Install specific plugin version (e.g. 0.8.1 or v0.8.1)")
 	checksum := flag.String("checksum", "", "Expected SHA256 checksum for verification")
-	statusCmd := flag.Bool("status", false, "Show current plugin and Qt Creator versions")
-	installCmd := flag.Bool("install", false, "Install or reinstall the latest plugin version")
-	updateCmd := flag.Bool("update", false, "Update plugin if a newer version is available")
+	waitPid := flag.Int("wait-pid", 0, "Wait for this process to exit before touching files")
+	waitTimeout := flag.Int("wait-timeout", 120, "Timeout for --wait-pid in seconds (0 = infinite)")
+	logFile := flag.String("log-file", "", "Mirror all output into a log file")
+	relaunchPath := flag.String("relaunch", "", "Launch this application after a successful install/update")
+	installCmd := flag.Bool("install", false, "Download and install the plugin")
+	updateCmd := flag.Bool("update", false, "Reinstall, removing old plugin files first")
 	removeCmd := flag.Bool("remove", false, "Remove installed plugin")
 	listVersionsCmd := flag.Bool("list-versions", false, "List all available plugin versions")
 
@@ -102,54 +99,82 @@ func main() {
 
 	if showVersion {
 		printVersion()
-		os.Exit(0)
+		return 0
 	}
 
 	if showHelp {
 		printUsage()
-		os.Exit(0)
+		return 0
 	}
 
-	if !*statusCmd && !*installCmd && !*updateCmd && !*removeCmd && !*listVersionsCmd {
-		printUsage()
-		os.Exit(0)
-	}
-
-	// Handle list-versions command (doesn't need config)
-	if *listVersionsCmd {
-		cmdErr := listVersions()
-		if cmdErr != nil {
-			fmt.Fprintf(os.Stderr, "Command failed: %v\n", cmdErr)
-			os.Exit(1)
+	if *logFile != "" {
+		closeLog, err := SetupLogFile(*logFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			return 1
 		}
-		os.Exit(0)
+		defer closeLog()
 	}
 
-	resolvedConfigPath, err := resolveConfigPath(*configPath, defaultConfigPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to resolve config path: %v\n", err)
-		os.Exit(1)
+	if !*installCmd && !*updateCmd && !*removeCmd && !*listVersionsCmd {
+		printUsage()
+		return 0
 	}
 
-	config, err := LoadConfig(resolvedConfigPath)
+	if *listVersionsCmd {
+		if err := listVersions(); err != nil {
+			PrintFatal(fmt.Sprintf("Command failed: %v", err))
+			return 1
+		}
+		return 0
+	}
+
+	pluginDir, err := resolvePluginDir(*pluginDirFlag)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
-		os.Exit(1)
+		PrintFatal(err.Error())
+		return 1
+	}
+
+	var qtcVersion *Version
+	if *installCmd || *updateCmd {
+		qtcVersion, err = resolveQtcVersion(*qtcVersionFlag)
+		if err != nil {
+			PrintFatal(err.Error())
+			return 1
+		}
+	}
+
+	if *waitPid > 0 {
+		PrintStep(fmt.Sprintf("Waiting for process %d to exit...", *waitPid))
+		timeout := time.Duration(*waitTimeout) * time.Second
+		if err := WaitForProcessExit(*waitPid, timeout); err != nil {
+			PrintFatal(err.Error())
+			return 1
+		}
+		PrintSuccess("Process exited")
 	}
 
 	var cmdErr error
-	if *statusCmd {
-		cmdErr = showStatus(config)
-	} else if *installCmd {
-		cmdErr = installPlugin(config, true, *pluginVersion, *checksum)
-	} else if *updateCmd {
-		cmdErr = updatePlugin(config, *pluginVersion, *checksum, yesFlag)
-	} else if *removeCmd {
-		cmdErr = removePlugin(config, yesFlag)
+	switch {
+	case *removeCmd:
+		cmdErr = removePlugin(pluginDir, yesFlag)
+	case *installCmd:
+		cmdErr = installPlugin(qtcVersion, pluginDir, *pluginVersion, *checksum, yesFlag)
+	case *updateCmd:
+		cmdErr = updatePlugin(qtcVersion, pluginDir, *pluginVersion, *checksum, yesFlag)
 	}
 
 	if cmdErr != nil {
-		fmt.Fprintf(os.Stderr, "Command failed: %v\n", cmdErr)
-		os.Exit(1)
+		PrintFatal(fmt.Sprintf("Command failed: %v", cmdErr))
+		return 1
 	}
+
+	if *relaunchPath != "" && (*installCmd || *updateCmd) {
+		PrintStep("Relaunching application...")
+		if err := RelaunchApplication(*relaunchPath); err != nil {
+			PrintWarning(fmt.Sprintf("Failed to relaunch: %v", err))
+		}
+	}
+
+	return 0
 }

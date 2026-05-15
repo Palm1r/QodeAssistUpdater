@@ -216,14 +216,25 @@ func FindPluginAsset(release *GithubRelease, qtCreatorVersion *Version) (string,
 		FullVersionMatch bool
 	}
 
+	qtcVersionPattern := regexp.MustCompile(`QtC(\d+\.\d+(?:\.\d+)?)`)
+	supportedQtcMap := make(map[string]bool)
+
 	for _, asset := range release.Assets {
 		name := asset.Name
 		hasPlatform := strings.Contains(name, platformName)
 		hasArch := strings.Contains(name, archName)
+		if !hasPlatform || !hasArch {
+			continue
+		}
+
+		if matches := qtcVersionPattern.FindStringSubmatch(name); len(matches) > 1 {
+			supportedQtcMap[matches[1]] = true
+		}
+
 		hasQtcVersionFull := strings.Contains(name, qtcVerFull)
 		hasQtcVersionMajorMinor := strings.Contains(name, qtcVerMajorMinor)
 
-		if hasPlatform && hasArch && (hasQtcVersionFull || hasQtcVersionMajorMinor) {
+		if hasQtcVersionFull || hasQtcVersionMajorMinor {
 			matchingAssets = append(matchingAssets, struct {
 				Name             string
 				URL              string
@@ -233,8 +244,18 @@ func FindPluginAsset(release *GithubRelease, qtCreatorVersion *Version) (string,
 	}
 
 	if len(matchingAssets) == 0 {
-		return "", "", fmt.Errorf("no matching asset found for %s %s Qt Creator %s",
-			platformName, archName, qtCreatorVersion.String())
+		if len(supportedQtcMap) > 0 {
+			supported := make([]string, 0, len(supportedQtcMap))
+			for v := range supportedQtcMap {
+				supported = append(supported, v)
+			}
+			sort.Strings(supported)
+			return "", "", fmt.Errorf("no plugin asset for %s %s with Qt Creator %s; "+
+				"this release supports Qt Creator: %s",
+				platformName, archName, qtCreatorVersion.String(), strings.Join(supported, ", "))
+		}
+		return "", "", fmt.Errorf("no plugin asset for %s %s in this release",
+			platformName, archName)
 	}
 
 	for _, asset := range matchingAssets {

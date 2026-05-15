@@ -64,7 +64,7 @@ func normalizeChecksum(checksum string) string {
 }
 
 func ConfirmAction(prompt string) bool {
-	fmt.Print(prompt)
+	fmt.Fprint(out, prompt)
 	reader := bufio.NewReader(os.Stdin)
 	response, err := reader.ReadString('\n')
 	if err != nil {

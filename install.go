@@ -62,12 +62,7 @@ func RemoveOldQodeAssistFiles(pluginDir string, interactive bool) error {
 		return nil
 	}
 
-	platformConfig, err := GetPlatformConfig()
-	if err != nil {
-		return err
-	}
-
-	filesToRemove, err := FindPluginFiles(pluginDir, platformConfig.PluginFileName)
+	filesToRemove, err := FindPluginFiles(pluginDir, GetPluginFileName())
 	if err != nil {
 		return fmt.Errorf("failed to find plugin files: %w", err)
 	}
@@ -176,7 +171,7 @@ func validateAndExtractFile(f archiveFile, destDir string, totalExtractedSize *i
 	return nil
 }
 
-func extractArchive(files []archiveFile, destDir, archiveType string) error {
+func extractArchive(files []archiveFile, destDir string) error {
 	var totalExtractedSize int64
 	fileCount := 0
 
@@ -204,7 +199,7 @@ func extractZipArchive(archivePath, destDir string) error {
 		files[i] = zipFileWrapper{f}
 	}
 
-	return extractArchive(files, destDir, "ZIP")
+	return extractArchive(files, destDir)
 }
 
 func extract7zArchive(archivePath, destDir string) error {
@@ -221,7 +216,7 @@ func extract7zArchive(archivePath, destDir string) error {
 		files[i] = sevenzipFileWrapper{f}
 	}
 
-	return extractArchive(files, destDir, "7z")
+	return extractArchive(files, destDir)
 }
 
 func RemovePlugin(pluginPath string, autoYes bool) error {
@@ -234,11 +229,6 @@ func RemovePlugin(pluginPath string, autoYes bool) error {
 		return fmt.Errorf("failed to check plugin path: %w", err)
 	}
 
-	platformConfig, err := GetPlatformConfig()
-	if err != nil {
-		return err
-	}
-
 	var filesToRemove []string
 	var searchDir string
 
@@ -247,7 +237,7 @@ func RemovePlugin(pluginPath string, autoYes bool) error {
 		searchDir = filepath.Dir(pluginPath)
 	} else {
 		searchDir = filepath.Dir(pluginPath)
-		filesToRemove, err = FindPluginFiles(searchDir, platformConfig.PluginFileName)
+		filesToRemove, err = FindPluginFiles(searchDir, GetPluginFileName())
 		if err != nil {
 			return err
 		}
@@ -316,4 +306,17 @@ func cleanupEmptyDirectories(pluginDir string) {
 	}
 
 	os.Remove(pluginDir)
+}
+
+func SanitizeFileMode(mode os.FileMode) os.FileMode {
+	mode &^= os.ModeSetuid | os.ModeSetgid | os.ModeSticky
+	mode = mode &^ GroupWriteMask
+
+	if mode.IsDir() {
+		return DefaultDirPermissions
+	}
+	if mode&ExecutableBitMask != 0 {
+		return ExecutablePermissions
+	}
+	return DefaultFilePermissions
 }

@@ -7,198 +7,53 @@ import (
 	"strings"
 )
 
-func showStatus(config *Config) error {
-	PrintHeader("QodeAssist Plugin Status")
-
-	_, err := getAndPrintQtCreatorVersion(config)
-	if err != nil {
-		return err
-	}
-
-	installedVersion, err := getInstalledVersion(config)
-	if err != nil {
-		PrintFieldColored("QodeAssist plugin", "Not installed", "red")
-	} else {
-		PrintFieldColored("QodeAssist plugin", installedVersion.String(), "green")
-	}
-
-	PrintField("Qt Creator path", Gray(config.QtCreatorPath))
-
-	pluginPath, err := config.GetPluginPath()
-	if err != nil {
-		PrintField("Plugin path", Gray(config.PluginPath)+" "+Red("(expansion failed)"))
-	} else {
-		PrintField("Plugin path", Gray(pluginPath))
-	}
-
-	fmt.Println()
-	PrintStep("Checking for updates...")
-	_, latestVersion, err := getAndPrintLatestRelease()
-	if err != nil {
-		return err
-	}
-
-	if installedVersion == nil {
-		PrintInfo("Run with --install to install the plugin")
-	} else if latestVersion.IsNewer(installedVersion) {
-		PrintStatus("warning", "Update available!")
-		PrintField("Current", Red(installedVersion.String()))
-		PrintField("Latest", Green(latestVersion.String()))
-		fmt.Println()
-		PrintInfo("Run with --update to upgrade")
-	} else {
-		PrintStatus("success", "Plugin is up to date")
-	}
-
-	return nil
-}
-
-func installPlugin(config *Config, force bool, version string, checksum string) error {
+func installPlugin(qtcVersion *Version, pluginDir, version, checksum string, autoYes bool) error {
 	PrintHeader("Install QodeAssist Plugin")
+	PrintFieldColored("Qt Creator", qtcVersion.String(), "blue")
+	PrintField("Plugin directory", Gray(pluginDir))
 
-	qtcVersion, err := getAndPrintQtCreatorVersion(config)
+	release, err := fetchRelease(version)
 	if err != nil {
 		return err
 	}
 
-	if !force {
-		installedVersion, err := getInstalledVersion(config)
-		if err == nil {
-			PrintWarning(fmt.Sprintf("Plugin already installed (v%s)", installedVersion))
-			PrintInfo("Use --update to upgrade to the latest version")
-			return nil
-		}
-	}
-
-	fmt.Println()
-	var release *GithubRelease
-	if version != "" {
-		PrintStep(fmt.Sprintf("Fetching release %s...", version))
-		release, err = getAndPrintSpecificRelease(version)
-		if err != nil {
-			return err
-		}
-	} else {
-		PrintStep("Fetching latest release...")
-		release, _, err = getAndPrintLatestRelease()
-		if err != nil {
-			return err
-		}
-	}
-
-	return performInstallation(release, qtcVersion, config, checksum, false, false)
+	return performInstallation(release, qtcVersion, pluginDir, checksum, false, autoYes)
 }
 
-func updatePlugin(config *Config, version string, checksum string, autoYes bool) error {
+func updatePlugin(qtcVersion *Version, pluginDir, version, checksum string, autoYes bool) error {
 	PrintHeader("Update QodeAssist Plugin")
+	PrintFieldColored("Qt Creator", qtcVersion.String(), "blue")
+	PrintField("Plugin directory", Gray(pluginDir))
 
-	qtcVersion, err := getAndPrintQtCreatorVersion(config)
+	release, err := fetchRelease(version)
 	if err != nil {
 		return err
 	}
 
-	installedVersion, err := getInstalledVersion(config)
-	if err != nil {
-		PrintError("Plugin not installed")
-		PrintInfo("Run with --install to install the plugin")
-		return nil
-	}
-	PrintFieldColored("Current version", installedVersion.String(), "cyan")
-
-	fmt.Println()
-	var release *GithubRelease
-	var targetVersion *Version
-
-	if version != "" {
-		PrintStep(fmt.Sprintf("Fetching release %s...", version))
-		release, err = getAndPrintSpecificRelease(version)
-		if err != nil {
-			return err
-		}
-		targetVersion, err = ParseVersion(release.TagName)
-		if err != nil {
-			return fmt.Errorf("failed to parse release version: %w", err)
-		}
-	} else {
-		PrintStep("Checking for updates...")
-		release, targetVersion, err = getAndPrintLatestRelease()
-		if err != nil {
-			return err
-		}
-	}
-
-	if !targetVersion.IsNewer(installedVersion) && version == "" {
-		PrintStatus("success", "Already up to date!")
-		return nil
-	}
-
-	if targetVersion.IsNewer(installedVersion) {
-		PrintStatus("info", "Update available")
-		PrintField("Current", Red(installedVersion.String()))
-		PrintField("Target", Green(targetVersion.String()))
-	} else if version != "" {
-		PrintStatus("warning", "Installing older or same version")
-		PrintField("Current", Yellow(installedVersion.String()))
-		PrintField("Target", Cyan(targetVersion.String()))
-	}
-	fmt.Println()
-
-	return performInstallation(release, qtcVersion, config, checksum, true, autoYes)
+	return performInstallation(release, qtcVersion, pluginDir, checksum, true, autoYes)
 }
 
-func removePlugin(config *Config, autoYes bool) error {
+func removePlugin(pluginDir string, autoYes bool) error {
 	PrintHeader("Remove QodeAssist Plugin")
+	PrintField("Plugin directory", Gray(pluginDir))
 
-	installedVersion, err := getInstalledVersion(config)
-	if err != nil {
-		PrintWarning("Plugin is not installed")
-		return nil
-	}
-	PrintFieldColored("Version", installedVersion.String(), "yellow")
-
-	pluginPath, err := config.GetPluginPath()
-
-	if err != nil {
-		return fmt.Errorf("failed to get plugin path: %w", err)
-	}
-
-	fmt.Println()
-	PrintStep("Removing plugin...")
-	PrintField("Location", Gray(pluginPath))
-
-	if err := RemovePlugin(pluginPath, autoYes); err != nil {
+	if err := RemovePlugin(pluginDir, autoYes); err != nil {
 		return fmt.Errorf("failed to remove plugin: %w", err)
 	}
 
-	PrintStatus("success", "Plugin removed successfully")
 	return nil
 }
 
-func getInstalledVersion(config *Config) (*Version, error) {
-	pluginPath, err := config.GetPluginPath()
-	if err != nil {
-		return nil, fmt.Errorf("plugin not installed: failed to get plugin path: %w", err)
+func fetchRelease(version string) (*GithubRelease, error) {
+	fmt.Println()
+	if version != "" {
+		PrintStep(fmt.Sprintf("Fetching release %s...", version))
+		return getAndPrintSpecificRelease(version)
 	}
 
-	if !CheckPluginInstalled(pluginPath, PluginName) {
-		return nil, fmt.Errorf("plugin not installed")
-	}
-
-	installedVersion, err := GetInstalledPluginVersionFromPath(pluginPath, PluginName, config.QtCreatorPath)
-	if err != nil {
-		return nil, fmt.Errorf("plugin not installed: %w", err)
-	}
-
-	return installedVersion, nil
-}
-
-func getAndPrintQtCreatorVersion(config *Config) (*Version, error) {
-	qtcVersion, err := config.GetQtCreatorVersion()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get Qt Creator version: %w", err)
-	}
-	PrintFieldColored("Qt Creator", qtcVersion.String(), "blue")
-	return qtcVersion, nil
+	PrintStep("Fetching latest release...")
+	release, _, err := getAndPrintLatestRelease()
+	return release, err
 }
 
 func getAndPrintLatestRelease() (*GithubRelease, *Version, error) {
@@ -296,7 +151,7 @@ func listVersions() error {
 	return nil
 }
 
-func performInstallation(release *GithubRelease, qtcVersion *Version, config *Config, checksum string, isUpdate bool, autoYes bool) error {
+func performInstallation(release *GithubRelease, qtcVersion *Version, pluginDir string, checksum string, isUpdate bool, autoYes bool) error {
 	assetName, assetURL, err := FindPluginAsset(release, qtcVersion)
 	if err != nil {
 		return fmt.Errorf("failed to find plugin asset: %w", err)
@@ -313,28 +168,20 @@ func performInstallation(release *GithubRelease, qtcVersion *Version, config *Co
 	}
 	defer os.Remove(tmpFile)
 
-	if checksum != "" {
-		PrintStep("Verifying checksum...")
-	}
 	if err := VerifyFileChecksum(tmpFile, checksum); err != nil {
 		return fmt.Errorf("checksum verification failed: %w", err)
 	}
 
-	pluginPath, err := config.GetPluginPath()
-	if err != nil {
-		return fmt.Errorf("failed to get plugin path: %w", err)
-	}
-
 	if isUpdate {
 		PrintStep("Checking for old plugin files...")
-		if err := RemoveOldQodeAssistFiles(pluginPath, !autoYes); err != nil {
+		if err := RemoveOldQodeAssistFiles(pluginDir, !autoYes); err != nil {
 			return fmt.Errorf("failed to remove old plugin files: %w", err)
 		}
 		fmt.Println()
 	}
 
 	PrintStep("Installing plugin...")
-	if err := InstallPlugin(tmpFile, pluginPath); err != nil {
+	if err := InstallPlugin(tmpFile, pluginDir); err != nil {
 		return fmt.Errorf("failed to install plugin: %w", err)
 	}
 

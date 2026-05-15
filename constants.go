@@ -6,9 +6,7 @@ const (
 	AppVersion = "0.1.0"
 	AppName    = "QodeAssist Plugin Updater"
 
-	GithubRepo   = "Palm1r/QodeAssist"
-	PluginName   = "QodeAssist"
-	PluginAuthor = "petrmironychev.qodeassist"
+	GithubRepo = "Palm1r/QodeAssist"
 
 	DefaultDirPermissions  = 0755
 	DefaultFilePermissions = 0644
@@ -22,14 +20,7 @@ const (
 
 	MaxDownloadSize = 500 * 1024 * 1024
 
-	HTTPTimeout    = 30 * time.Second
-	CommandTimeout = 10 * time.Second
-
-	InitialBackoff = 1 * time.Second
-	MaxBackoff     = 30 * time.Second
-	MaxRetries     = 3
+	HTTPTimeout = 30 * time.Second
 
 	MaxGitHubAPIResponseSize = 10 * 1024 * 1024
-
-	MaxSearchDepth = 5
 )
