@@ -1,11 +1,20 @@
 package main
 
 import (
+	"bufio"
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
+)
+
+var (
+	qtCreatorVersionRegex = regexp.MustCompile(`(\d+)\.(\d+)\.(\d+)`)
+	pluginLineRegex       = regexp.MustCompile(`^\s+(\S+)\s+(\d+\.\d+\.\d+)\b`)
 )
 
 type Version struct {
@@ -67,28 +76,70 @@ func (v *Version) String() string {
 	return fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
 }
 
+type QtCreatorInfo struct {
+	Version        *Version
+	PluginVersions map[string]*Version
+}
+
+func GetQtCreatorInfo(qtCreatorRootPath string) (*QtCreatorInfo, error) {
+	execPath, err := GetQtCreatorExecutablePath(qtCreatorRootPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find Qt Creator executable: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), CommandTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, execPath, "--version")
+	output, err := cmd.CombinedOutput()
+
+	if ctx.Err() == context.DeadlineExceeded {
+		return nil, fmt.Errorf("qtcreator --version timed out after %v", CommandTimeout)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to run qtcreator --version: %w", err)
+	}
+
+	return parseQtCreatorVersionOutput(string(output))
+}
+
+func parseQtCreatorVersionOutput(output string) (*QtCreatorInfo, error) {
+	info := &QtCreatorInfo{PluginVersions: make(map[string]*Version)}
+
+	scanner := bufio.NewScanner(strings.NewReader(output))
+	for scanner.Scan() {
+		line := scanner.Text()
+		trimmed := strings.TrimSpace(line)
+
+		if rest, ok := strings.CutPrefix(trimmed, "Version:"); ok {
+			if match := qtCreatorVersionRegex.FindString(rest); match != "" {
+				if version, err := ParseVersion(match); err == nil {
+					info.Version = version
+				}
+			}
+			continue
+		}
+
+		if m := pluginLineRegex.FindStringSubmatch(line); m != nil {
+			if version, err := ParseVersion(m[2]); err == nil {
+				info.PluginVersions[strings.ToLower(m[1])] = version
+			}
+		}
+	}
+
+	if info.Version == nil {
+		return nil, fmt.Errorf("could not parse Qt Creator version from output: %q", output)
+	}
+
+	return info, nil
+}
+
 func GetQtCreatorVersion(qtCreatorRootPath string) (*Version, error) {
-	qtPluginInfoPath, err := GetQtPluginInfoPath(qtCreatorRootPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find qtplugininfo: %w", err)
-	}
-
-	corePluginPath, err := FindCorePlugin(qtCreatorRootPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find core plugin: %w", err)
-	}
-
-	metadata, err := ExecuteQtPluginInfo(qtPluginInfoPath, corePluginPath)
+	info, err := GetQtCreatorInfo(qtCreatorRootPath)
 	if err != nil {
 		return nil, err
 	}
-
-	version, err := ParseVersion(metadata.MetaData.Version)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse version: %w", err)
-	}
-
-	return version, nil
+	return info.Version, nil
 }
 
 func findPluginFile(pluginPath, pluginName string) string {
@@ -138,26 +189,10 @@ func CheckPluginInstalled(pluginPath, pluginName string) bool {
 	return findPluginFile(pluginPath, pluginName) != ""
 }
 
-func GetInstalledPluginVersionFromPath(pluginPath, pluginName, qtCreatorPath string) (*Version, error) {
-	pluginFile := findPluginFile(pluginPath, pluginName)
-	if pluginFile == "" {
-		return nil, fmt.Errorf("plugin library file not found in directory: %s", pluginPath)
+func GetInstalledPluginVersion(qtCreatorInfo *QtCreatorInfo, pluginName string) (*Version, error) {
+	version, ok := qtCreatorInfo.PluginVersions[strings.ToLower(pluginName)]
+	if !ok {
+		return nil, fmt.Errorf("plugin %q not reported by Qt Creator", pluginName)
 	}
-
-	qtPluginInfoPath, err := GetQtPluginInfoPath(qtCreatorPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find qtplugininfo: %w", err)
-	}
-
-	metadata, err := ExecuteQtPluginInfo(qtPluginInfoPath, pluginFile)
-	if err != nil {
-		return nil, err
-	}
-
-	version, err := ParseVersion(metadata.MetaData.Version)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse version: %w", err)
-	}
-
 	return version, nil
 }

@@ -15,7 +15,7 @@ type Config struct {
 	PluginPath    string `yaml:"plugin_path"`
 
 	mu             sync.RWMutex
-	qtcVersion     *Version
+	qtcInfo        *QtCreatorInfo
 	versionFetched bool
 }
 
@@ -185,23 +185,23 @@ plugin_path: "%s"
 
 func (c *Config) expandVariables(path string) (string, error) {
 	c.mu.RLock()
-	qtcVersion := c.qtcVersion
+	qtcInfo := c.qtcInfo
 	c.mu.RUnlock()
 
-	if qtcVersion == nil {
+	if qtcInfo == nil || qtcInfo.Version == nil {
 		return path, nil
 	}
 
-	path = strings.ReplaceAll(path, "{qtc_version}", qtcVersion.String())
+	path = strings.ReplaceAll(path, "{qtc_version}", qtcInfo.Version.String())
 	return path, nil
 }
 
-func (c *Config) GetQtCreatorVersion() (*Version, error) {
+func (c *Config) GetQtCreatorInfo() (*QtCreatorInfo, error) {
 	c.mu.RLock()
 	if c.versionFetched {
-		version := c.qtcVersion
+		info := c.qtcInfo
 		c.mu.RUnlock()
-		return version, nil
+		return info, nil
 	}
 	c.mu.RUnlock()
 
@@ -209,17 +209,25 @@ func (c *Config) GetQtCreatorVersion() (*Version, error) {
 	defer c.mu.Unlock()
 
 	if c.versionFetched {
-		return c.qtcVersion, nil
+		return c.qtcInfo, nil
 	}
 
-	version, err := GetQtCreatorVersion(c.QtCreatorPath)
+	info, err := GetQtCreatorInfo(c.QtCreatorPath)
 	if err != nil {
 		return nil, err
 	}
 
-	c.qtcVersion = version
+	c.qtcInfo = info
 	c.versionFetched = true
-	return version, nil
+	return info, nil
+}
+
+func (c *Config) GetQtCreatorVersion() (*Version, error) {
+	info, err := c.GetQtCreatorInfo()
+	if err != nil {
+		return nil, err
+	}
+	return info.Version, nil
 }
 
 func (c *Config) GetPluginPath() (string, error) {
