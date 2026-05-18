@@ -184,7 +184,12 @@ func getInstalledVersion(config *Config) (*Version, error) {
 		return nil, fmt.Errorf("plugin not installed")
 	}
 
-	installedVersion, err := GetInstalledPluginVersionFromPath(pluginPath, PluginName, config.QtCreatorPath)
+	qtcInfo, err := config.GetQtCreatorInfo()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Qt Creator info: %w", err)
+	}
+
+	installedVersion, err := GetInstalledPluginVersion(qtcInfo, PluginName)
 	if err != nil {
 		return nil, fmt.Errorf("plugin not installed: %w", err)
 	}
