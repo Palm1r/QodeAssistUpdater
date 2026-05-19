@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -37,21 +38,109 @@ func LoadConfig(path string) (*Config, error) {
 	return &config, nil
 }
 
+func expandQtcPath(path string) []string {
+	pattern := strings.ReplaceAll(path, "{qtc_version}", "*")
+	if !strings.ContainsAny(pattern, "*?[") {
+		return []string{pattern}
+	}
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil
+	}
+	return matches
+}
+
+func pickNewestQtCreator(candidates []string) string {
+	var bestPath string
+	var bestVersion *Version
+	for _, path := range candidates {
+		info, err := os.Stat(path)
+		if err != nil || !info.IsDir() {
+			continue
+		}
+		version, err := GetQtCreatorVersion(path)
+		if err != nil {
+			continue
+		}
+		if version.IsNewer(bestVersion) {
+			bestVersion = version
+			bestPath = path
+		}
+	}
+	return bestPath
+}
+
+func findQtCreatorOnPath() string {
+	for _, name := range []string{"qtcreator", "qtcreator.exe"} {
+		execPath, err := exec.LookPath(name)
+		if err != nil {
+			continue
+		}
+
+		if resolved, rerr := filepath.EvalSymlinks(execPath); rerr == nil {
+			execPath = resolved
+		}
+
+		// The binary lives at <root>/bin/<name> or <root>/<name>.
+		for _, root := range []string{
+			filepath.Dir(filepath.Dir(execPath)),
+			filepath.Dir(execPath),
+		} {
+			if _, err := GetQtCreatorVersion(root); err == nil {
+				return root
+			}
+		}
+	}
+
+	return ""
+}
+
 func findQtCreator() (string, error) {
+	if root := findQtCreatorOnPath(); root != "" {
+		return root, nil
+	}
+
 	platformConfig, err := GetPlatformConfig()
 	if err != nil {
 		return "", err
 	}
 
-	for _, path := range platformConfig.QtCreatorPaths {
-		if info, err := os.Stat(path); err == nil && info.IsDir() {
-			if _, err := GetQtCreatorVersion(path); err == nil {
-				return path, nil
-			}
+	for _, candidate := range platformConfig.QtCreatorPaths {
+		if best := pickNewestQtCreator(expandQtcPath(candidate)); best != "" {
+			return best, nil
 		}
 	}
 
 	return "", fmt.Errorf("Qt Creator not found in any default location")
+}
+
+func NewConfigFromArgs(qtcPath, pluginPath string) (*Config, error) {
+	if qtcPath == "" {
+		detected, err := findQtCreator()
+		if err != nil {
+			return nil, fmt.Errorf("qtcreator path not provided and auto-detection failed: %w", err)
+		}
+		qtcPath = detected
+	}
+
+	config := &Config{QtCreatorPath: qtcPath, PluginPath: pluginPath}
+
+	if pluginPath == "" {
+		if err := config.validateQtCreatorPath(); err != nil {
+			return nil, err
+		}
+		detected, err := findPlugin(config.QtCreatorPath)
+		if err != nil {
+			return nil, fmt.Errorf("plugin path not provided and auto-detection failed: %w", err)
+		}
+		config.PluginPath = detected
+	}
+
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
+	}
+
+	return config, nil
 }
 
 func findPlugin(qtCreatorPath string) (string, error) {
@@ -135,6 +224,12 @@ func CreateDefaultConfig(path string) error {
 		} else {
 			pluginPath = plugPath
 			foundPlugin = true
+		}
+	}
+
+	if foundQtCreator {
+		if version, verr := GetQtCreatorVersion(qtCreatorPath); verr == nil {
+			qtCreatorPath = strings.Replace(qtCreatorPath, version.String(), "{qtc_version}", 1)
 		}
 	}
 
@@ -248,6 +343,15 @@ func (c *Config) validateQtCreatorPath() error {
 	if err != nil {
 		return fmt.Errorf("failed to expand qtcreator_path: %w", err)
 	}
+
+	if strings.Contains(expandedPath, "{qtc_version}") {
+		resolved := pickNewestQtCreator(expandQtcPath(expandedPath))
+		if resolved == "" {
+			return fmt.Errorf("qtcreator_path %q did not match any Qt Creator installation", c.QtCreatorPath)
+		}
+		expandedPath = resolved
+	}
+
 	c.QtCreatorPath = expandedPath
 
 	qtcInfo, err := os.Stat(c.QtCreatorPath)

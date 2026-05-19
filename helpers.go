@@ -4,7 +4,45 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
+
+func findQtPluginsDirs(root, pluginsSubPath string, maxDepth int) []string {
+	if !PathExists(root) {
+		return nil
+	}
+
+	var result []string
+	filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil || !d.IsDir() {
+			return nil
+		}
+
+		rel, relErr := filepath.Rel(root, path)
+		if relErr != nil {
+			return nil
+		}
+		depth := 0
+		if rel != "." {
+			depth = strings.Count(rel, string(os.PathSeparator)) + 1
+		}
+		if depth >= maxDepth {
+			return filepath.SkipDir
+		}
+
+		if d.Name() == "QtProject" {
+			pluginsDir := filepath.Join(path, pluginsSubPath)
+			if info, statErr := os.Stat(pluginsDir); statErr == nil && info.IsDir() {
+				result = append(result, pluginsDir)
+			}
+			return filepath.SkipDir
+		}
+
+		return nil
+	})
+
+	return result
+}
 
 func FindFileInDirectory(baseDir, targetName string, maxDepth int, matchFunc func(os.DirEntry, string) bool) (string, error) {
 	if maxDepth <= 0 {
