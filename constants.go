@@ -3,7 +3,7 @@ package main
 import "time"
 
 const (
-	AppVersion = "0.1.0"
+	AppVersion = "0.2.0"
 	AppName    = "QodeAssist Plugin Updater"
 
 	GithubRepo   = "Palm1r/QodeAssist"
