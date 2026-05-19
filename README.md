@@ -77,6 +77,17 @@ For automated scripts and CI/CD pipelines, use the `--yes` or `-y` flag to skip 
 ./qodeassist-updater --config /path/to/config.yaml --update
 ```
 
+### Running without config.yaml
+
+You can pass paths directly on the command line. When `--qtc-path` or `--plugin-path` is given, `config.yaml` is neither read nor created — any path you omit is auto-detected.
+
+```bash
+./qodeassist-updater --status --qtc-path ~/qtcreator-19.0.1
+./qodeassist-updater --update --qtc-path ~/qtcreator-19.0.1 --plugin-path ~/path/to/plugins
+```
+
+Qt Creator is also auto-detected via the `qtcreator` executable on `PATH`, so a standard installation usually needs no paths at all.
+
 ## Configuration
 
 On first run, `config.yaml` is created:
@@ -87,6 +98,12 @@ plugin_path: "/path/to/plugins/{qtc_version}/petrmironychev.qodeassist"
 ```
 
 **Important**: Use the `{qtc_version}` variable in `plugin_path` — it will be automatically replaced with your Qt Creator version.
+
+You can also use `{qtc_version}` in `qtcreator_path`. There it acts as a version wildcard: the updater globs for matching installations and picks the newest one. This is useful for the official Linux installer, which installs into a versioned directory such as `~/qtcreator-19.0.1`:
+
+```yaml
+qtcreator_path: "~/qtcreator-{qtc_version}"
+```
 
 ### Typical plugin paths
 

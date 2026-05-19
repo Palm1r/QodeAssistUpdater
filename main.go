@@ -20,6 +20,8 @@ func printUsage() {
 	fmt.Println("  --list-versions  List all available plugin versions (>= 0.5.9)")
 	fmt.Println("\nOptions:")
 	fmt.Println("  --config <path>         Path to configuration file (default: config.yaml)")
+	fmt.Println("  --qtc-path <path>       Path to Qt Creator (run without config.yaml)")
+	fmt.Println("  --plugin-path <path>    Path to plugin directory (run without config.yaml)")
 	fmt.Println("  --plugin-version <ver>  Install specific plugin version (e.g., 0.8.1 or v0.8.1)")
 	fmt.Println("  --checksum <hash>       Expected SHA256 checksum for verification (optional)")
 	fmt.Println("  -y, --yes               Automatic yes to prompts (non-interactive mode)")
@@ -38,6 +40,7 @@ func printUsage() {
 	fmt.Println("  qodeassist-updater --remove --yes")
 	fmt.Println("  qodeassist-updater --list-versions")
 	fmt.Println("  qodeassist-updater --config /path/to/config.yaml --update")
+	fmt.Println("  qodeassist-updater --update --qtc-path ~/qtcreator-19.0.1 --plugin-path ~/path/to/plugins")
 }
 
 func printVersion() {
@@ -79,6 +82,8 @@ func resolveConfigPath(configPath string, defaultPath string) (string, error) {
 func main() {
 	defaultConfigPath := "config.yaml"
 	configPath := flag.String("config", defaultConfigPath, "Path to configuration file")
+	qtcPathFlag := flag.String("qtc-path", "", "Path to Qt Creator (run without config.yaml)")
+	pluginPathFlag := flag.String("plugin-path", "", "Path to plugin directory (run without config.yaml)")
 	pluginVersion := flag.String("plugin-version", "", "Install specific plugin version (e.g., 0.8.1 or v0.8.1)")
 	checksum := flag.String("checksum", "", "Expected SHA256 checksum for verification")
 	statusCmd := flag.Bool("status", false, "Show current plugin and Qt Creator versions")
@@ -125,16 +130,27 @@ func main() {
 		os.Exit(0)
 	}
 
-	resolvedConfigPath, err := resolveConfigPath(*configPath, defaultConfigPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to resolve config path: %v\n", err)
-		os.Exit(1)
-	}
+	var config *Config
+	var err error
 
-	config, err := LoadConfig(resolvedConfigPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
-		os.Exit(1)
+	if *qtcPathFlag != "" || *pluginPathFlag != "" {
+		config, err = NewConfigFromArgs(*qtcPathFlag, *pluginPathFlag)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to build configuration: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		resolvedConfigPath, resolveErr := resolveConfigPath(*configPath, defaultConfigPath)
+		if resolveErr != nil {
+			fmt.Fprintf(os.Stderr, "Failed to resolve config path: %v\n", resolveErr)
+			os.Exit(1)
+		}
+
+		config, err = LoadConfig(resolvedConfigPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	var cmdErr error

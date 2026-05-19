@@ -41,16 +41,18 @@ func GetPlatformConfig() (*PlatformConfig, error) {
 		}, nil
 
 	case "linux":
+		dataHome, configHome := linuxXDGDirs(homeDir)
 		return &PlatformConfig{
 			QtCreatorPaths: []string{
 				filepath.Join(homeDir, "Qt", "Tools", "QtCreator"),
+				filepath.Join(homeDir, "qtcreator-{qtc_version}"),
 				"/usr",
 				"/usr/local",
 				"/opt/Qt/Tools/QtCreator",
 			},
 			PluginPaths: []string{
-				filepath.Join(homeDir, ".local", "share", "data", "QtProject", "qtcreator", "plugins", "{qtc_version}", PluginAuthor),
-				filepath.Join(homeDir, ".config", "QtProject", "qtcreator", "plugins", "{qtc_version}", PluginAuthor),
+				filepath.Join(dataHome, "data", "QtProject", "qtcreator", "plugins", "{qtc_version}", PluginAuthor),
+				filepath.Join(configHome, "QtProject", "qtcreator", "plugins", "{qtc_version}", PluginAuthor),
 			},
 			ExecutableNames: []string{
 				filepath.Join("bin", "qtcreator"),
@@ -116,6 +118,31 @@ func GetPlatformArchName() (platform, arch string, err error) {
 	return platform, arch, nil
 }
 
+func linuxXDGDirs(homeDir string) (dataHome, configHome string) {
+	dataHome = os.Getenv("XDG_DATA_HOME")
+	if dataHome == "" {
+		dataHome = filepath.Join(homeDir, ".local", "share")
+	}
+	configHome = os.Getenv("XDG_CONFIG_HOME")
+	if configHome == "" {
+		configHome = filepath.Join(homeDir, ".config")
+	}
+	return dataHome, configHome
+}
+
+func dedupStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, v := range values {
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		result = append(result, v)
+	}
+	return result
+}
+
 func GetPluginSearchDirs(qtCreatorPath string, version *Version) ([]string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -133,9 +160,13 @@ func GetPluginSearchDirs(qtCreatorPath string, version *Version) ([]string, erro
 		searchDirs = append(searchDirs, qtcBuiltinPlugins)
 
 	case "linux":
-		userPluginsBase1 := filepath.Join(homeDir, ".local", "share", "data", "QtProject", "qtcreator", "plugins", versionStr)
-		userPluginsBase2 := filepath.Join(homeDir, ".config", "QtProject", "qtcreator", "plugins", versionStr)
-		searchDirs = append(searchDirs, userPluginsBase1, userPluginsBase2)
+		pluginsSubPath := filepath.Join("qtcreator", "plugins")
+		dataHome, configHome := linuxXDGDirs(homeDir)
+		for _, root := range dedupStrings([]string{dataHome, configHome}) {
+			for _, pluginsDir := range findQtPluginsDirs(root, pluginsSubPath, 4) {
+				searchDirs = append(searchDirs, filepath.Join(pluginsDir, versionStr))
+			}
+		}
 		qtcBuiltinPlugins := filepath.Join(qtCreatorPath, "lib", "qtcreator", "plugins")
 		searchDirs = append(searchDirs, qtcBuiltinPlugins)
 
