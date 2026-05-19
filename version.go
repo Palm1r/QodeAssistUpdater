@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 )
@@ -82,6 +83,13 @@ type QtCreatorInfo struct {
 }
 
 func GetQtCreatorInfo(qtCreatorRootPath string) (*QtCreatorInfo, error) {
+	if runtime.GOOS == "windows" {
+		return getQtCreatorInfoViaPluginInfo(qtCreatorRootPath)
+	}
+	return getQtCreatorInfoViaVersionFlag(qtCreatorRootPath)
+}
+
+func getQtCreatorInfoViaVersionFlag(qtCreatorRootPath string) (*QtCreatorInfo, error) {
 	execPath, err := GetQtCreatorExecutablePath(qtCreatorRootPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find Qt Creator executable: %w", err)
@@ -101,6 +109,31 @@ func GetQtCreatorInfo(qtCreatorRootPath string) (*QtCreatorInfo, error) {
 	}
 
 	return parseQtCreatorVersionOutput(string(output))
+}
+
+// getQtCreatorInfoViaPluginInfo reads the Qt Creator version from the Core
+func getQtCreatorInfoViaPluginInfo(qtCreatorRootPath string) (*QtCreatorInfo, error) {
+	qtPluginInfoPath, err := GetQtPluginInfoPath(qtCreatorRootPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find qtplugininfo: %w", err)
+	}
+
+	corePluginPath, err := FindCorePlugin(qtCreatorRootPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find core plugin: %w", err)
+	}
+
+	metadata, err := ExecuteQtPluginInfo(qtPluginInfoPath, corePluginPath)
+	if err != nil {
+		return nil, err
+	}
+
+	version, err := ParseVersion(metadata.MetaData.Version)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse version: %w", err)
+	}
+
+	return &QtCreatorInfo{Version: version, PluginVersions: make(map[string]*Version)}, nil
 }
 
 func parseQtCreatorVersionOutput(output string) (*QtCreatorInfo, error) {
@@ -189,10 +222,38 @@ func CheckPluginInstalled(pluginPath, pluginName string) bool {
 	return findPluginFile(pluginPath, pluginName) != ""
 }
 
-func GetInstalledPluginVersion(qtCreatorInfo *QtCreatorInfo, pluginName string) (*Version, error) {
+func GetInstalledPluginVersion(qtCreatorInfo *QtCreatorInfo, pluginName, pluginPath, qtCreatorRootPath string) (*Version, error) {
+	if runtime.GOOS == "windows" {
+		return getInstalledPluginVersionViaPluginInfo(pluginPath, pluginName, qtCreatorRootPath)
+	}
+
 	version, ok := qtCreatorInfo.PluginVersions[strings.ToLower(pluginName)]
 	if !ok {
 		return nil, fmt.Errorf("plugin %q not reported by Qt Creator", pluginName)
 	}
+	return version, nil
+}
+
+func getInstalledPluginVersionViaPluginInfo(pluginPath, pluginName, qtCreatorRootPath string) (*Version, error) {
+	pluginFile := findPluginFile(pluginPath, pluginName)
+	if pluginFile == "" {
+		return nil, fmt.Errorf("plugin library file not found in directory: %s", pluginPath)
+	}
+
+	qtPluginInfoPath, err := GetQtPluginInfoPath(qtCreatorRootPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find qtplugininfo: %w", err)
+	}
+
+	metadata, err := ExecuteQtPluginInfo(qtPluginInfoPath, pluginFile)
+	if err != nil {
+		return nil, err
+	}
+
+	version, err := ParseVersion(metadata.MetaData.Version)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse version: %w", err)
+	}
+
 	return version, nil
 }

@@ -90,6 +90,24 @@ func GetPlatformConfig() (*PlatformConfig, error) {
 	}
 }
 
+func GetQtPluginInfoName() string {
+	if runtime.GOOS == "windows" {
+		return "qtplugininfo.exe"
+	}
+	return "qtplugininfo"
+}
+
+func GetCorePluginName() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "libCore.dylib"
+	case "windows":
+		return "Core.dll"
+	default:
+		return "libCore.so"
+	}
+}
+
 func GetPlatformArchName() (platform, arch string, err error) {
 	switch runtime.GOOS {
 	case "windows":
