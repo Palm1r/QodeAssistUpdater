@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 func printUsage() {
@@ -24,6 +25,9 @@ func printUsage() {
 	fmt.Println("  --plugin-path <path>    Path to plugin directory (run without config.yaml)")
 	fmt.Println("  --plugin-version <ver>  Install specific plugin version (e.g., 0.8.1 or v0.8.1)")
 	fmt.Println("  --checksum <hash>       Expected SHA256 checksum for verification (optional)")
+	fmt.Println("  --wait-pid <pid>        Wait for given PID to exit before install/update/remove")
+	fmt.Println("  --wait-timeout <sec>    Timeout for --wait-pid (default 30)")
+	fmt.Println("  --restart-qtc           Launch Qt Creator after a successful install/update")
 	fmt.Println("  -y, --yes               Automatic yes to prompts (non-interactive mode)")
 	fmt.Println("  -h, --help              Show this help message")
 	fmt.Println("  -v, --version           Show version information")
@@ -41,6 +45,7 @@ func printUsage() {
 	fmt.Println("  qodeassist-updater --list-versions")
 	fmt.Println("  qodeassist-updater --config /path/to/config.yaml --update")
 	fmt.Println("  qodeassist-updater --update --qtc-path ~/qtcreator-19.0.1 --plugin-path ~/path/to/plugins")
+	fmt.Println("  qodeassist-updater --update --yes --wait-pid 12345 --restart-qtc")
 }
 
 func printVersion() {
@@ -95,6 +100,10 @@ func main() {
 	var yesFlag bool
 	flag.BoolVar(&yesFlag, "yes", false, "Automatic yes to prompts (non-interactive mode)")
 	flag.BoolVar(&yesFlag, "y", false, "Automatic yes to prompts (non-interactive mode)")
+
+	waitPid := flag.Int("wait-pid", 0, "Wait for given PID to exit before install/update/remove")
+	waitTimeout := flag.Int("wait-timeout", 30, "Timeout in seconds for --wait-pid")
+	restartQtc := flag.Bool("restart-qtc", false, "Launch Qt Creator after a successful install/update")
 
 	var showHelp, showVersion bool
 	flag.BoolVar(&showHelp, "help", false, "Show help message")
@@ -153,6 +162,15 @@ func main() {
 		}
 	}
 
+	mutatesPlugin := *installCmd || *updateCmd || *removeCmd
+	if *waitPid > 0 && mutatesPlugin {
+		timeout := time.Duration(*waitTimeout) * time.Second
+		if err := WaitForProcessExit(*waitPid, timeout); err != nil {
+			fmt.Fprintf(os.Stderr, "Wait for PID %d failed: %v\n", *waitPid, err)
+			os.Exit(1)
+		}
+	}
+
 	var cmdErr error
 	if *statusCmd {
 		cmdErr = showStatus(config)
@@ -167,5 +185,11 @@ func main() {
 	if cmdErr != nil {
 		fmt.Fprintf(os.Stderr, "Command failed: %v\n", cmdErr)
 		os.Exit(1)
+	}
+
+	if *restartQtc && (*installCmd || *updateCmd) {
+		if err := RestartQtCreator(config); err != nil {
+			PrintWarning(fmt.Sprintf("Failed to restart Qt Creator: %v", err))
+		}
 	}
 }

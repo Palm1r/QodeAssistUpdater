@@ -62,6 +62,20 @@ You can install or update to a specific plugin version:
 ./qodeassist-updater --install --plugin-version 0.8.1 --checksum abc123...
 ```
 
+### Updating while Qt Creator is running
+
+When the updater is launched from inside Qt Creator (e.g. via a detached `QProcess` from the plugin), pass the Qt Creator PID so the updater waits for it to exit before touching plugin files, then optionally relaunches it:
+
+```bash
+./qodeassist-updater --update --yes \
+    --qtc-path /path/to/Qt\ Creator --plugin-path /path/to/plugins \
+    --wait-pid <qtc-pid> --restart-qtc
+```
+
+- `--wait-pid <pid>` — polls until the process exits before install/update/remove. Required on Windows (the plugin DLL is locked while Qt Creator runs). Recommended on macOS/Linux too — the running instance otherwise keeps the old plugin in memory.
+- `--wait-timeout <sec>` — how long to wait for the PID to disappear (default 30).
+- `--restart-qtc` — launch Qt Creator again after a successful install/update.
+
 ### Non-interactive mode
 
 For automated scripts and CI/CD pipelines, use the `--yes` or `-y` flag to skip confirmation prompts:
